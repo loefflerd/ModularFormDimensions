@@ -1,6 +1,8 @@
 import Mathlib.Analysis.Meromorphic.Order
 import Mathlib.Analysis.Calculus.Deriv.Mul
 import Mathlib.Analysis.Calculus.Deriv.Pow
+import Mathlib.Analysis.Calculus.InverseFunctionTheorem.Deriv
+import Mathlib.Analysis.Complex.CauchyIntegral
 
 /-!
 # Mathlib PR #33000: analytic order of a composition
@@ -104,11 +106,98 @@ lemma MeromorphicAt.meromorphicOrderAt_comp_of_deriv_ne_zero
   rw [hf.meromorphicOrderAt_comp hg, hgo] <;>
   simp [eventuallyConst_iff_analyticOrderAt_sub_eq_top, hgo]
 
+/-- If `g` is analytic at `x`, and `g' x ≠ 0`, then the meromorphic order of
+`f ∘ g` at `x` is the meromorphic order of `f` at `g x` (even if `f` is not meromorphic). -/
+lemma meromorphicOrderAt_comp_of_deriv_ne_zero (hg : AnalyticAt 𝕜 g x) (hg' : deriv g x ≠ 0)
+    [CompleteSpace 𝕜] [CharZero 𝕜] :
+    meromorphicOrderAt (f ∘ g) x = meromorphicOrderAt f (g x) := by
+  by_cases hf : MeromorphicAt f (g x)
+  · exact hf.meromorphicOrderAt_comp_of_deriv_ne_zero hg hg'
+  · rw [meromorphicOrderAt_of_not_meromorphicAt hf, meromorphicOrderAt_of_not_meromorphicAt]
+    contrapose! hf
+    -- The remainder of this proof is showing that analytic functions with nonzero derivative
+    -- have analytic inverses. TODO: extract this into a self-contained lemma.
+    have hgd : HasStrictDerivAt g (deriv g x) x := by
+      refine hasStrictDerivAt_iff_hasStrictFDerivAt.mpr ?_
+      convert hg.hasStrictFDerivAt using 1
+      ext
+      simp
+    have hgfd : HasStrictFDerivAt g
+        (((ContinuousLinearEquiv.unitsEquivAut 𝕜) (Units.mk0 _ hg'))).toContinuousLinearMap
+        x := hgd
+    let R := hgfd.toOpenPartialHomeomorph _
+    have hx : x ∈ R.source := HasStrictFDerivAt.mem_toOpenPartialHomeomorph_source _
+    have hra : AnalyticAt 𝕜 R.symm (g x) := by
+      refine (R.hasFPowerSeriesAt_symm hx hg.hasFPowerSeriesAt
+        (i := (ContinuousLinearEquiv.unitsEquivAut 𝕜) (.mk0 _ hg')) ?_).analyticAt
+      ext
+      simp
+    have hrne : deriv R.symm (g x) ≠ 0 := by
+      simpa [(hgd.to_local_left_inverse hg' (R.eventually_left_inverse hx)).hasDerivAt.deriv]
+    apply (((R.left_inv hx) ▸ hf).comp_analyticAt hra).congr
+    exact .fun_comp ((R.eventually_right_inverse' hx).filter_mono nhdsWithin_le_nhds) f
+
 /-- If `g` is analytic at `x`, `f` is meromorphic at `g x`, and `g' x ≠ 0`, then the order of
 `f ∘ g` at `x` is the order of `f` at `g x`. -/
-lemma AnalyticAt.analyticOrderAt_comp_of_deriv_ne_zero {g : 𝕜 → 𝕜}
+lemma AnalyticAt.analyticOrderAt_comp_of_deriv_ne_zero
     (hf : AnalyticAt 𝕜 f (g x)) (hg : AnalyticAt 𝕜 g x) (hg' : deriv g x ≠ 0) :
     analyticOrderAt (f ∘ g) x = analyticOrderAt f (g x) := by
   simp [hf.analyticOrderAt_comp hg, hg.analyticOrderAt_sub_eq_one_of_deriv_ne_zero hg']
+
+/-- If `g` is analytic at `x` and `g' x ≠ 0`, then the order of `f ∘ g` at `x` is the order of `f`
+at `g x` (even if `f` is not analytic). -/
+lemma analyticOrderAt_comp_of_deriv_ne_zero [CompleteSpace 𝕜] [CharZero 𝕜]
+    (hg : AnalyticAt 𝕜 g x) (hg' : deriv g x ≠ 0) :
+    analyticOrderAt (f ∘ g) x = analyticOrderAt f (g x) := by
+  by_cases hf : AnalyticAt 𝕜 f (g x)
+  · exact hf.analyticOrderAt_comp_of_deriv_ne_zero hg hg'
+  · rw [analyticOrderAt_of_not_analyticAt hf, analyticOrderAt_of_not_analyticAt]
+    contrapose! hf
+    -- The remainder of this proof is showing that analytic functions with nonzero derivative
+    -- have analytic inverses. TODO: extract this into a self-contained lemma.
+    have hgd : HasStrictDerivAt g (deriv g x) x := by
+      refine hasStrictDerivAt_iff_hasStrictFDerivAt.mpr ?_
+      convert hg.hasStrictFDerivAt using 1
+      ext
+      simp
+    have hgfd : HasStrictFDerivAt g
+        (((ContinuousLinearEquiv.unitsEquivAut 𝕜) (Units.mk0 _ hg'))).toContinuousLinearMap
+        x := hgd
+    let R := hgfd.toOpenPartialHomeomorph _
+    have hx : x ∈ R.source := HasStrictFDerivAt.mem_toOpenPartialHomeomorph_source _
+    have hra : AnalyticAt 𝕜 R.symm (g x) := by
+      refine (R.hasFPowerSeriesAt_symm hx hg.hasFPowerSeriesAt
+        (i := (ContinuousLinearEquiv.unitsEquivAut 𝕜) (.mk0 _ hg')) ?_).analyticAt
+      ext
+      simp
+    have hrne : deriv R.symm (g x) ≠ 0 := by
+      simpa [(hgd.to_local_left_inverse hg' (R.eventually_left_inverse hx)).hasDerivAt.deriv]
+    apply (((R.left_inv hx) ▸ hf).comp hra).congr
+    exact .fun_comp (R.eventually_right_inverse' hx) f
+
+lemma meromorphicAt_smul_iff_of_ne_zero (hg : AnalyticAt 𝕜 g x) (hg' : g x ≠ 0) :
+    MeromorphicAt (g • f) x ↔ MeromorphicAt f x := by
+  refine ⟨fun hfg ↦ ?_, hg.meromorphicAt.smul⟩
+  refine (hg.inv hg').meromorphicAt.smul hfg |>.congr ?_
+  filter_upwards [(hg.continuousAt.mono_left nhdsWithin_le_nhds).eventually_ne hg'] with z hz
+  simp [inv_smul_smul₀ hz]
+
+lemma meromorphicOrderAt_smul_of_ne_zero (hg : AnalyticAt 𝕜 g x) (hg' : g x ≠ 0) :
+    meromorphicOrderAt (g • f) x = meromorphicOrderAt f x := by
+  by_cases hf : MeromorphicAt f x
+  · simp [meromorphicOrderAt_smul hg.meromorphicAt hf, hg.meromorphicOrderAt_eq,
+      hg.analyticOrderAt_eq_zero.mpr hg']
+  · rw [meromorphicOrderAt_of_not_meromorphicAt hf, meromorphicOrderAt_of_not_meromorphicAt]
+    rwa [meromorphicAt_smul_iff_of_ne_zero hg hg']
+
+
+lemma meromorphicAt_mul_iff_of_ne_zero {f : 𝕜 → 𝕜} (hg : AnalyticAt 𝕜 g x) (hg' : g x ≠ 0) :
+    MeromorphicAt (g * f) x ↔ MeromorphicAt f x :=
+  meromorphicAt_smul_iff_of_ne_zero hg hg'
+
+lemma meromorphicOrderAt_mul_of_ne_zero {f : 𝕜 → 𝕜} (hg : AnalyticAt 𝕜 g x) (hg' : g x ≠ 0) :
+    meromorphicOrderAt (g * f) x = meromorphicOrderAt f x :=
+  meromorphicOrderAt_smul_of_ne_zero hg hg'
+
 
 end comp
