@@ -1,4 +1,4 @@
-import ModularFormDimensions.Basic
 import ModularFormDimensions.Divisor
-import ModularFormDimensions.MathlibPRs.MeromorphicOrder
-import ModularFormDimensions.MathlibPRs.ModularFormBounds
+import ModularFormDimensions.FundamentalDomain
+import ModularFormDimensions.Measure
+import ModularFormDimensions.Stabilizer

@@ -12,7 +12,7 @@ maxSynthPendingDepth = 3
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"
-rev = "v4.27.0-rc1"
+rev = "e1462b59fd2d0ee84a6e956925a968d92312a20a"
 
 [[lean_lib]]
 name = "ModularFormDimensions"

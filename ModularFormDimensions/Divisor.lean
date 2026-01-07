@@ -10,13 +10,11 @@ import Mathlib.Analysis.Complex.UpperHalfPlane.Manifold
 import Mathlib.Algebra.Group.Action.Sum
 import Mathlib.Analysis.Meromorphic.Order
 import Mathlib.Analysis.Complex.CauchyIntegral
-
-import ModularFormDimensions.MathlibPRs.MeromorphicOrder
-
+import Mathlib.Analysis.Meromorphic.NormalForm
 
 open UpperHalfPlane Filter Topology
 
-open scoped ModularForm
+open scoped ModularForm Manifold
 
 private lemma UpperHalfPlane.analyticAt_smul {g : GL (Fin 2) ℝ} (hg : 0 < g.val.det) (τ : ℍ) :
     AnalyticAt ℂ (fun z ↦ ↑(g • ofComplex z) : ℂ → ℂ) τ := by
@@ -92,8 +90,8 @@ local notation "Y(" 𝒢 ")" => OpenModularCurve 𝒢
 
 TODO: Is this the morally right definition? Do we want to `weight` it by
 the order of the stabilizer (at a cost of being `ℚ∞`-valued)? -/
-noncomputable def meromorphicOrderQuotient {k : ℤ} (f : SlashInvariantForm 𝒢 k)
-    [𝒢.HasDetOne] : Y(𝒢) → WithTop ℤ :=
+noncomputable def meromorphicOrderQuotient {k : ℤ} (f : SlashInvariantForm 𝒢 k) [𝒢.HasDetOne] :
+    Y(𝒢) → WithTop ℤ :=
   Quotient.lift (meromorphicOrderAt (f ∘ ofComplex) ·) (by
     rintro _ b ⟨⟨g, hg⟩, rfl⟩
     dsimp only [Subgroup.smul_def, Function.comp_def]
@@ -105,6 +103,44 @@ noncomputable def meromorphicOrderQuotient {k : ℤ} (f : SlashInvariantForm �
 lemma meromorphicOrderQuotient_mk [𝒢.HasDetOne] {k : ℤ} (f : SlashInvariantForm 𝒢 k) (τ : ℍ) :
     meromorphicOrderQuotient 𝒢 f ⟦τ⟧ = meromorphicOrderAt (fun z ↦ f (ofComplex z)) ↑τ := by
   rfl
+
+/-- Quotient of two meromorphic functions, in normal form. This is analytic wherever
+it can be. -/
+noncomputable def meroNFQuotient (f g : ℍ → ℂ) (τ : ℍ) :=
+  toMeromorphicNFOn ((f ∘ ofComplex) / (g ∘ ofComplex)) upperHalfPlaneSet τ
+
+lemma mdifferentiableAt_meroNFQuotient {f g : ℍ → ℂ} {τ : ℍ}
+    (hf : MeromorphicOn (f ∘ ofComplex) upperHalfPlaneSet)
+    (hg : MeromorphicOn (g ∘ ofComplex) upperHalfPlaneSet)
+    (hle : ∀ (ξ : ℍ), meromorphicOrderAt (g ∘ ofComplex) ξ
+      ≤ meromorphicOrderAt (f ∘ ofComplex) ξ) :
+    MDifferentiableAt 𝓘(ℂ) 𝓘(ℂ) (meroNFQuotient f g) τ := by
+  rw [mdifferentiableAt_iff]
+  have : (meroNFQuotient f g ∘ ofComplex) =ᶠ[𝓝 ↑τ]
+      toMeromorphicNFOn ((f ∘ ofComplex) / (g ∘ ofComplex)) upperHalfPlaneSet := by
+    filter_upwards [isOpen_upperHalfPlaneSet.mem_nhds τ.im_pos] with a ha
+    simp [meroNFQuotient, ofComplex_apply_of_im_pos, ha]
+  rw [this.differentiableAt_iff]
+  suffices AnalyticOnNhd ℂ _ upperHalfPlaneSet from (this ↑τ τ.im_pos).differentiableAt
+  rw [← MeromorphicNFOn.divisor_nonneg_iff_analyticOnNhd]
+  · intro a
+    by_cases ha : 0 < a.im
+    · rw [(meromorphicNFOn_toMeromorphicNFOn _ _).meromorphicOn.divisor_apply (by exact ha)]
+      simp only [Function.locallyFinsuppWithin.coe_zero,
+        Pi.zero_apply, WithTop.untop₀_nonneg]
+      simp only [div_eq_mul_inv]
+      rw [meromorphicOrderAt_toMeromorphicNFOn (hf.mul hg.inv) ha,
+          meromorphicOrderAt_mul (hf a ha) (hg a ha).inv,
+          meromorphicOrderAt_inv, ← sub_eq_add_neg]
+      specialize hle (.mk a ha)
+      generalize hr : meromorphicOrderAt (f ∘ ↑ofComplex) a = r
+      generalize hs : meromorphicOrderAt (g ∘ ↑ofComplex) a = s
+      cases r with | top => simp | coe r =>
+      cases s with | top => simp | coe s =>
+      norm_cast
+      aesop
+    · simp [ha]
+  · exact meromorphicNFOn_toMeromorphicNFOn _ _
 
 /-- The quotient `𝒢 \ ℍ⋆`, where `𝒢` is a subgroup of `GL(2, ℝ)` and `ℍ⋆` denotes the union of
 `ℍ` and the cusps of `𝒢`. -/
